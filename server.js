@@ -1,81 +1,110 @@
 const express = require('express');
-const { Client } = require('pg');
+const { Pool } = require('pg');
 const cors = require('cors');
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const client = new Client({
-    connectionString: process.env.DATABASE_URL
+// Conexión a PostgreSQL usando DATABASE_URL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false } // Necesario para Railway
 });
 
-client.connect();
+// Crear tabla si no existe
+async function crearTabla() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS personas (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        apellido VARCHAR(100) NOT NULL,
+        ciudad VARCHAR(100),
+        ocupacion VARCHAR(100),
+        relato TEXT,
+        fecha TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Tabla personas lista');
+  } catch (error) {
+    console.error('❌ Error creando tabla:', error);
+  }
+}
 
-console.log('✅ Conectando a BD...');
-
-// POST - Crear registro
-app.post('/api/personas', async (req, res) => {
-    const { nombre, apellido, ciudad, ocupacion, relato } = req.body;
-    try {
-        const result = await client.query(
-            'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [nombre, apellido, ciudad, ocupacion, relato]
-        );
-        res.json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// GET - Listar todos
+// Rutas
 app.get('/api/personas', async (req, res) => {
-    try {
-        const result = await client.query('SELECT * FROM personas ORDER BY fecha DESC');
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  try {
+    const result = await pool.query('SELECT * FROM personas ORDER BY fecha DESC');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// GET - Buscar
+app.post('/api/personas', async (req, res) => {
+  const { nombre, apellido, ciudad, ocupacion, relato } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nombre, apellido, ciudad, ocupacion, relato]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/personas/buscar', async (req, res) => {
-    const { nombre, ciudad } = req.query;
-    try {
-        let query = 'SELECT * FROM personas WHERE 1=1';
-        const params = [];
-        let paramCount = 1;
-        
-        if (nombre) {
-            query += ` AND (nombre ILIKE $${paramCount} OR apellido ILIKE $${paramCount + 1})`;
-            params.push(`%${nombre}%`, `%${nombre}%`);
-            paramCount += 2;
-        }
-        
-        if (ciudad) {
-            query += ` AND ciudad ILIKE $${paramCount}`;
-            params.push(`%${ciudad}%`);
-        }
-        
-        query += ' ORDER BY fecha DESC';
-        const result = await client.query(query, params);
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+  const { nombre, ciudad } = req.query;
+  try {
+    let query = 'SELECT * FROM personas WHERE 1=1';
+    const params = [];
+    
+    if (nombre) {
+      query += ` AND nombre ILIKE $${params.length + 1}`;
+      params.push(`%${nombre}%`);
     }
+    if (ciudad) {
+      query += ` AND ciudad ILIKE $${params.length + 1}`;
+      params.push(`%${ciudad}%`);
+    }
+    
+    query += ' ORDER BY fecha DESC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// DELETE - Eliminar
 app.delete('/api/personas/:id', async (req, res) => {
-    try {
-        await client.query('DELETE FROM personas WHERE id = $1', [req.params.id]);
-        res.json({ mensaje: '✅ Eliminado' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  try {
+    const result = await pool.query('DELETE FROM personas WHERE id = $1 RETURNING *', [req.params.id]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`✅ Servidor en puerto ${PORT}`);
-});
+// Iniciar servidor
+const PORT = process.env.PORT || 8080;
+
+(async () => {
+  try {
+    console.log('✅ Conectando a BD...');
+    await pool.query('SELECT NOW()'); // Probar conexión
+    console.log('✅ BD conectada');
+    
+    await crearTabla();
+    
+    app.listen(PORT, () => {
+      console.log(`✅ Servidor en puerto ${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    process.exit(1);
+  }
+})();
