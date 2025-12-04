@@ -107,4 +107,51 @@ const PORT = process.env.PORT || 8080;
     console.error('❌ Error:', error.message);
     process.exit(1);
   }
+  // Descargar Excel con todos los datos
+app.get('/api/personas/descargar/excel', async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+    
+    // Obtener todas las personas
+    const result = await pool.query('SELECT * FROM personas ORDER BY fecha DESC');
+    const personas = result.rows;
+
+    // Transformar datos para Excel
+    const datosExcel = personas.map(p => ({
+      'ID': p.id,
+      'Nombre': p.nombre,
+      'Apellido': p.apellido,
+      'Ciudad': p.ciudad || '',
+      'Ocupación': p.ocupacion || '',
+      'Relato': p.relato || '',
+      'Fecha': new Date(p.fecha).toLocaleDateString('es-EC')
+    }));
+
+    // Crear workbook
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+    
+    // Ajustar ancho de columnas
+    worksheet['!cols'] = [
+      { wch: 5 },  // ID
+      { wch: 15 }, // Nombre
+      { wch: 15 }, // Apellido
+      { wch: 15 }, // Ciudad
+      { wch: 15 }, // Ocupación
+      { wch: 30 }, // Relato
+      { wch: 12 }  // Fecha
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Personas');
+
+    // Enviar archivo
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=registro-nacional.xlsx');
+    
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+    res.send(excelBuffer);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 })();
