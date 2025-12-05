@@ -154,6 +154,14 @@ const PORT = process.env.PORT || 8080;
     console.log('✅ BD conectada');
     
     await crearTabla();
+
+    // 👇 Llenar fechas NULL con NOW()
+    await pool.query(`
+      UPDATE personas
+      SET fecha = NOW()
+      WHERE fecha IS NULL
+    `);
+    console.log('✅ Fechas NULL actualizadas');
     
     app.listen(PORT, () => {
       console.log(`✅ Servidor en puerto ${PORT}`);
