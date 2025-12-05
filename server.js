@@ -1,6 +1,7 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const XLSX = require('xlsx');
 
 const app = express();
 
@@ -22,6 +23,7 @@ async function crearTabla() {
         id SERIAL PRIMARY KEY,
         nombre VARCHAR(100) NOT NULL,
         apellido VARCHAR(100) NOT NULL,
+        edad INTEGER,
         ciudad VARCHAR(100),
         ocupacion VARCHAR(100),
         relato TEXT,
@@ -34,9 +36,12 @@ async function crearTabla() {
   }
 }
 
-// Rutas
+// ============================================
+// 📋 ENDPOINT 1: LISTAR TODOS
+// ============================================
 app.get('/api/personas', async (req, res) => {
   try {
+    // 👇 ORDENAMIENTO POR FECHA DESC (más nuevos primero)
     const result = await pool.query('SELECT * FROM personas ORDER BY fecha DESC');
     res.json(result.rows);
   } catch (error) {
@@ -44,12 +49,15 @@ app.get('/api/personas', async (req, res) => {
   }
 });
 
+// ============================================
+// ✏️ ENDPOINT 2: CREAR REGISTRO
+// ============================================
 app.post('/api/personas', async (req, res) => {
-  const { nombre, apellido, ciudad, ocupacion, relato } = req.body;
+  const { nombre, apellido, edad, ciudad, ocupacion, relato } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [nombre, apellido, ciudad, ocupacion, relato]
+      'INSERT INTO personas (nombre, apellido, edad, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [nombre, apellido, edad, ciudad, ocupacion, relato]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -57,26 +65,31 @@ app.post('/api/personas', async (req, res) => {
   }
 });
 
+// ============================================
+// 🔍 ENDPOINT 3: BUSCAR AVANZADO
+// ============================================
 app.get('/api/personas/buscar', async (req, res) => {
   const { nombre, ciudad } = req.query;
   try {
     let query = 'SELECT * FROM personas WHERE 1=1';
     const params = [];
     
+    // Búsqueda en nombre O apellido (solo 1 parámetro)
     if (nombre) {
-      // Buscar en nombre O apellido
-      query += ` AND (nombre ILIKE $${params.length + 1} OR apellido ILIKE $${params.length + 2})`;
-      params.push(`%${nombre}%`);
-      params.push(`%${nombre}%`);
+      const searchTerm = `%${nombre}%`;
+      query += ` AND (nombre ILIKE $1 OR apellido ILIKE $1)`;
+      params.push(searchTerm);
     }
     
+    // Búsqueda en ciudad
     if (ciudad) {
-      const cityParamIndex = params.length + 1;
-      query += ` AND ciudad ILIKE $${cityParamIndex}`;
+      query += ` AND ciudad ILIKE $${params.length + 1}`;
       params.push(`%${ciudad}%`);
     }
     
+    // 👇 ORDENAMIENTO POR FECHA DESC (más nuevos primero)
     query += ' ORDER BY fecha DESC';
+    
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
@@ -84,6 +97,57 @@ app.get('/api/personas/buscar', async (req, res) => {
   }
 });
 
+// ============================================
+// 📊 ENDPOINT 4: DESCARGAR EXCEL
+// ============================================
+app.get('/api/personas/descargar/excel', async (req, res) => {
+  try {
+    // 👇 ORDENAMIENTO POR FECHA DESC (más nuevos primero)
+    const result = await pool.query('SELECT * FROM personas ORDER BY fecha DESC');
+    const personas = result.rows;
+
+    // Formatear datos para Excel
+    const datosExcel = personas.map(p => ({
+      'ID': p.id,
+      'Nombre': p.nombre,
+      'Apellido': p.apellido,
+      'Edad': p.edad || '',
+      'Ciudad': p.ciudad || '',
+      'Ocupación': p.ocupacion || '',
+      'Relato': p.relato || '',
+      'Fecha': new Date(p.fecha).toLocaleDateString('es-EC')
+    }));
+
+    // Crear workbook
+    const ws = XLSX.utils.json_to_sheet(datosExcel);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Registro');
+
+    // Ajustar ancho de columnas
+    ws['!cols'] = [
+      { wch: 5 },   // ID
+      { wch: 15 },  // Nombre
+      { wch: 15 },  // Apellido
+      { wch: 8 },   // Edad
+      { wch: 15 },  // Ciudad
+      { wch: 15 },  // Ocupación
+      { wch: 40 },  // Relato
+      { wch: 12 }   // Fecha
+    ];
+
+    // Enviar como buffer
+    const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=registro-nacional.xlsx');
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// 🗑️ ENDPOINT 5: ELIMINAR REGISTRO
+// ============================================
 app.delete('/api/personas/:id', async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM personas WHERE id = $1 RETURNING *', [req.params.id]);
@@ -93,7 +157,9 @@ app.delete('/api/personas/:id', async (req, res) => {
   }
 });
 
+// ============================================
 // Iniciar servidor
+// ============================================
 const PORT = process.env.PORT || 8080;
 
 (async () => {
@@ -111,51 +177,4 @@ const PORT = process.env.PORT || 8080;
     console.error('❌ Error:', error.message);
     process.exit(1);
   }
-  // Descargar Excel con todos los datos
-app.get('/api/personas/descargar/excel', async (req, res) => {
-  try {
-    const XLSX = require('xlsx');
-    
-    // Obtener todas las personas
-    const result = await pool.query('SELECT * FROM personas ORDER BY fecha DESC');
-    const personas = result.rows;
-
-    // Transformar datos para Excel
-    const datosExcel = personas.map(p => ({
-      'ID': p.id,
-      'Nombre': p.nombre,
-      'Apellido': p.apellido,
-      'Ciudad': p.ciudad || '',
-      'Ocupación': p.ocupacion || '',
-      'Relato': p.relato || '',
-      'Fecha': new Date(p.fecha).toLocaleDateString('es-EC')
-    }));
-
-    // Crear workbook
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
-    
-    // Ajustar ancho de columnas
-    worksheet['!cols'] = [
-      { wch: 5 },  // ID
-      { wch: 15 }, // Nombre
-      { wch: 15 }, // Apellido
-      { wch: 15 }, // Ciudad
-      { wch: 15 }, // Ocupación
-      { wch: 30 }, // Relato
-      { wch: 12 }  // Fecha
-    ];
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Personas');
-
-    // Enviar archivo
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=registro-nacional.xlsx');
-    
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-    res.send(excelBuffer);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 })();
