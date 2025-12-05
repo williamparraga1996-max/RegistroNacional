@@ -38,6 +38,13 @@ async function crearTabla() {
     `);
     console.log('✅ Columna fecha convertida a TIMESTAMP');
 
+    // 👇 Crear VIEW para ver datos ordenados por ID DESC
+    await pool.query(`
+      CREATE OR REPLACE VIEW personas_ordenadas AS
+      SELECT * FROM personas ORDER BY id DESC
+    `);
+    console.log('✅ VIEW personas_ordenadas creada (para ver en Railway)');
+
   } catch (error) {
     console.error('❌ Error creando tabla:', error);
   }
@@ -51,6 +58,18 @@ app.get('/api/personas', async (req, res) => {
     // 👇 ORDENAMIENTO POR ID DESC (más nuevos/altos primero)
     const result = await pool.query('SELECT * FROM personas ORDER BY id DESC');
     res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// 📋 ENDPOINT 1.5: VER ÚLTIMO REGISTRO
+// ============================================
+app.get('/api/personas/ultimo', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM personas ORDER BY id DESC LIMIT 1');
+    res.json(result.rows[0] || { id: 'No hay registros' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
