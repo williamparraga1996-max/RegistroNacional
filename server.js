@@ -54,9 +54,9 @@ app.get('/api/personas', async (req, res) => {
 app.post('/api/personas', async (req, res) => {
   const { nombre, apellido, ciudad, ocupacion, relato } = req.body;
   try {
-    // 👇 La fecha se guarda automáticamente con DEFAULT NOW()
+    // 👇 Asignar fecha explícitamente (no confiar solo en DEFAULT NOW())
     const result = await pool.query(
-      'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato, fecha) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
       [nombre, apellido, ciudad, ocupacion, relato]
     );
     res.status(201).json(result.rows[0]);
