@@ -54,6 +54,7 @@ app.get('/api/personas', async (req, res) => {
 app.post('/api/personas', async (req, res) => {
   const { nombre, apellido, ciudad, ocupacion, relato } = req.body;
   try {
+    // 👇 La fecha se guarda automáticamente con DEFAULT NOW()
     const result = await pool.query(
       'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [nombre, apellido, ciudad, ocupacion, relato]
@@ -113,7 +114,7 @@ app.get('/api/personas/descargar/excel', async (req, res) => {
       'Ciudad': p.ciudad || '',
       'Ocupación': p.ocupacion || '',
       'Relato': p.relato || '',
-      'Fecha': new Date(p.fecha).toLocaleDateString('es-EC')
+      'Fecha': p.fecha ? new Date(p.fecha).toLocaleDateString('es-EC') : ''
     }));
 
     // Crear workbook
