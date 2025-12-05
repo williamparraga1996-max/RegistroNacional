@@ -30,6 +30,14 @@ async function crearTabla() {
       )
     `);
     console.log('✅ Tabla personas lista');
+
+    // 👇 Cambiar tipo de dato de fecha a TIMESTAMP si está como DATE
+    await pool.query(`
+      ALTER TABLE personas
+      ALTER COLUMN fecha TYPE TIMESTAMP DEFAULT NOW()
+    `);
+    console.log('✅ Columna fecha convertida a TIMESTAMP');
+
   } catch (error) {
     console.error('❌ Error creando tabla:', error);
   }
@@ -54,9 +62,9 @@ app.get('/api/personas', async (req, res) => {
 app.post('/api/personas', async (req, res) => {
   const { nombre, apellido, ciudad, ocupacion, relato } = req.body;
   try {
-    // 👇 Asignar fecha explícitamente (no confiar solo en DEFAULT NOW())
+    // 👇 Asignar fecha y hora explícitamente con NOW()
     const result = await pool.query(
-      'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato, fecha) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
+      'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato, fecha) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, nombre, apellido, ciudad, ocupacion, relato, fecha',
       [nombre, apellido, ciudad, ocupacion, relato]
     );
     res.status(201).json(result.rows[0]);
