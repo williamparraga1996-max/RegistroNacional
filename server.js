@@ -31,10 +31,10 @@ async function crearTabla() {
     `);
     console.log('✅ Tabla personas lista');
 
-    // 👇 Cambiar tipo de dato de fecha a TIMESTAMP si está como DATE
+    // 👇 Cambiar tipo de dato de fecha a TIMESTAMP
     await pool.query(`
       ALTER TABLE personas
-      ALTER COLUMN fecha TYPE TIMESTAMP DEFAULT NOW()
+      ALTER COLUMN fecha TYPE TIMESTAMP
     `);
     console.log('✅ Columna fecha convertida a TIMESTAMP');
 
