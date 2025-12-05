@@ -23,7 +23,6 @@ async function crearTabla() {
         id SERIAL PRIMARY KEY,
         nombre VARCHAR(100) NOT NULL,
         apellido VARCHAR(100) NOT NULL,
-        edad INTEGER,
         ciudad VARCHAR(100),
         ocupacion VARCHAR(100),
         relato TEXT,
@@ -53,11 +52,11 @@ app.get('/api/personas', async (req, res) => {
 // ✏️ ENDPOINT 2: CREAR REGISTRO
 // ============================================
 app.post('/api/personas', async (req, res) => {
-  const { nombre, apellido, edad, ciudad, ocupacion, relato } = req.body;
+  const { nombre, apellido, ciudad, ocupacion, relato } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO personas (nombre, apellido, edad, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [nombre, apellido, edad, ciudad, ocupacion, relato]
+      'INSERT INTO personas (nombre, apellido, ciudad, ocupacion, relato) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nombre, apellido, ciudad, ocupacion, relato]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -111,7 +110,6 @@ app.get('/api/personas/descargar/excel', async (req, res) => {
       'ID': p.id,
       'Nombre': p.nombre,
       'Apellido': p.apellido,
-      'Edad': p.edad || '',
       'Ciudad': p.ciudad || '',
       'Ocupación': p.ocupacion || '',
       'Relato': p.relato || '',
@@ -128,7 +126,6 @@ app.get('/api/personas/descargar/excel', async (req, res) => {
       { wch: 5 },   // ID
       { wch: 15 },  // Nombre
       { wch: 15 },  // Apellido
-      { wch: 8 },   // Edad
       { wch: 15 },  // Ciudad
       { wch: 15 },  // Ocupación
       { wch: 40 },  // Relato
@@ -140,18 +137,6 @@ app.get('/api/personas/descargar/excel', async (req, res) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=registro-nacional.xlsx');
     res.send(buffer);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================
-// 🗑️ ENDPOINT 5: ELIMINAR REGISTRO
-// ============================================
-app.delete('/api/personas/:id', async (req, res) => {
-  try {
-    const result = await pool.query('DELETE FROM personas WHERE id = $1 RETURNING *', [req.params.id]);
-    res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
