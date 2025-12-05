@@ -40,8 +40,8 @@ async function crearTabla() {
 // ============================================
 app.get('/api/personas', async (req, res) => {
   try {
-    // 👇 ORDENAMIENTO POR FECHA DESC (más nuevos primero)
-    const result = await pool.query('SELECT * FROM personas ORDER BY fecha DESC');
+    // 👇 ORDENAMIENTO POR ID DESC (más nuevos/altos primero)
+    const result = await pool.query('SELECT * FROM personas ORDER BY id DESC');
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -87,8 +87,8 @@ app.get('/api/personas/buscar', async (req, res) => {
       params.push(`%${ciudad}%`);
     }
     
-    // 👇 ORDENAMIENTO POR FECHA DESC (más nuevos primero)
-    query += ' ORDER BY fecha DESC';
+    // 👇 ORDENAMIENTO POR ID DESC (más nuevos/altos primero)
+    query += ' ORDER BY id DESC';
     
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -102,8 +102,8 @@ app.get('/api/personas/buscar', async (req, res) => {
 // ============================================
 app.get('/api/personas/descargar/excel', async (req, res) => {
   try {
-    // 👇 ORDENAMIENTO POR FECHA DESC (más nuevos primero)
-    const result = await pool.query('SELECT * FROM personas ORDER BY fecha DESC');
+    // 👇 ORDENAMIENTO POR ID DESC (más nuevos/altos primero)
+    const result = await pool.query('SELECT * FROM personas ORDER BY id DESC');
     const personas = result.rows;
 
     // Formatear datos para Excel
