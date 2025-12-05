@@ -63,16 +63,16 @@ app.get('/api/personas/buscar', async (req, res) => {
     let query = 'SELECT * FROM personas WHERE 1=1';
     const params = [];
     
-    // Buscar en nombre Y apellido juntos
     if (nombre) {
-      query += ` AND (nombre ILIKE $${params.length + 1} OR apellido ILIKE $${params.length + 1} OR CONCAT(nombre, ' ', apellido) ILIKE $${params.length + 1})`;
-      params.push(`%${nombre}%`);
+      // Buscar en nombre O apellido
+      query += ` AND (nombre ILIKE $${params.length + 1} OR apellido ILIKE $${params.length + 2})`;
       params.push(`%${nombre}%`);
       params.push(`%${nombre}%`);
     }
     
     if (ciudad) {
-      query += ` AND ciudad ILIKE $${params.length + 1}`;
+      const cityParamIndex = params.length + 1;
+      query += ` AND ciudad ILIKE $${cityParamIndex}`;
       params.push(`%${ciudad}%`);
     }
     
